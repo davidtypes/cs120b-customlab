@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="CS010B">
+        <serverdata>
+          <mappings>
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire/src" web="/" />
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI/src" web="/" />
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI1/src" web="/" />
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/Flash/src" web="/" />
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire1/src" web="/" />
+            <mapping local="$USER_HOME$/.platformio/packages/framework-arduino-avr-minicore/libraries/SoftwareSerial/src" web="/" />
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
