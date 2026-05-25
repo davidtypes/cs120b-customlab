@@ -67,3 +67,24 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+
+# PlatformIO build output
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# CLion / JetBrains project files
+.idea/
+cmake-build-*/
+
+# Compiled/build files
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+
+# OS junk
+.DS_Store
+Thumbs.db
