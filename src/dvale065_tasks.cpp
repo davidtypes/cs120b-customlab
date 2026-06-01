@@ -6,18 +6,17 @@
 #define PADDLE_WIDTH 32
 #define PADDLE_HEIGHT 5
 
-#define BALL_SIZE 5 // ball is drawn as a 5x5 square
+#define BALL_SIZE 5 // ball is not round :(
 
 #define BRICK_WIDTH 18
 #define BRICK_HEIGHT 8
 #define BRICK_X_SPACE 20
-#define BRICK_Y_SPACE 20
+#define BRICK_Y_SPACE 10
 #define BRICK_ROWS 3
 #define BRICK_COLS 6 // do not change probably...
 
 #define PADDLE_SPEED 2
 
-#define JOYSTICK_X_CHANNEL 0 // A0 / PC0
 #define JOYSTICK_LEFT_THRESHOLD 350
 #define JOYSTICK_RIGHT_THRESHOLD 650
 
@@ -26,15 +25,18 @@ unsigned char lastPaddleX, lastPaddleY;
 unsigned char ballX, ballY;
 unsigned char lastBallX, lastBallY;
 
-bool bricks[BRICK_ROWS][BRICK_COLS];
-bool brickBroken;
+bool bricks[BRICK_ROWS][BRICK_COLS]; // to know if a brick should be drawn...
+bool brickBroken; // flag for redraw, maybe later deprecated
 unsigned char brokenBrickRow, brokenBrickCol;
 unsigned char score;
 
 signed char inputDirection; // -1 = left, 0 = neutral, 1 = right
+
+
+// lowkey i dont fully know how the adc stuff works
 void ADC_init() {
-    ADMUX = (1 << REFS0); // AVcc reference, start on ADC0
-    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0); // enable ADC, prescaler 128
+    ADMUX = (1 << REFS0);
+    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 }
 
 unsigned short ADC_read(unsigned char channel) {
@@ -44,8 +46,6 @@ unsigned short ADC_read(unsigned char channel) {
     while (ADCSRA & (1 << ADSC)) {}
     return ADC;
 }
-
-
 
 void drawBall(unsigned char x, unsigned char y, unsigned int color = LCD_WHITE) {
     LCD_fillRect(x, y, BALL_SIZE, BALL_SIZE, color);
@@ -100,14 +100,15 @@ void gameInit() {
     inputDirection = 0;
 
     for (unsigned char row = 0; row < BRICK_ROWS; row++) {
-        for (unsigned char col = 0; col < BRICK_COLS; col++) {
-            bricks[row][col] = true;
-        }
+      for (unsigned char col = 0; col < BRICK_COLS; col++) {
+        bricks[row][col] = true;
+      }
     }
 
-    drawBall(61, 65);
-    drawPaddle(48, 10);
-    drawBricks();
+  LCD_fillScreen(LCD_BLACK);
+  drawBall(ballX, ballY);
+  drawPaddle(paddleX, paddleY);
+  drawBricks();
 }
 
 enum Display_States { DISPLAY_START, DISPLAY_UPDATE };
@@ -116,11 +117,9 @@ int TickFct_Display(int state) {
         case DISPLAY_START:
             state = DISPLAY_UPDATE;
             break;
-
         case DISPLAY_UPDATE:
             state = DISPLAY_UPDATE;
             break;
-
         default:
             state = DISPLAY_START;
             break;
@@ -128,33 +127,24 @@ int TickFct_Display(int state) {
 
     switch (state) {
         case DISPLAY_UPDATE:
-            if (!brickBroken &&
-                (ballX == lastBallX && ballY == lastBallY) &&
-                (paddleX == lastPaddleX && paddleY == lastPaddleY)) {
-                break;
-            }
-
             if (brickBroken) {
                 unsigned char x = 105 - brokenBrickCol * BRICK_X_SPACE;
                 unsigned char y = 132 - brokenBrickRow * BRICK_Y_SPACE;
                 LCD_fillRect(x, y, BRICK_WIDTH, BRICK_HEIGHT, LCD_BLACK);
                 brickBroken = false;
             }
-
             if (ballX != lastBallX || ballY != lastBallY) {
                 drawBall(lastBallX, lastBallY, LCD_BLACK);
                 drawBall(ballX, ballY);
                 lastBallX = ballX;
                 lastBallY = ballY;
             }
-
             if (paddleX != lastPaddleX || paddleY != lastPaddleY) {
                 drawPaddle(lastPaddleX, lastPaddleY, LCD_BLACK);
                 drawPaddle(paddleX, paddleY);
                 lastPaddleX = paddleX;
                 lastPaddleY = paddleY;
             }
-
             break;
     }
 
@@ -167,11 +157,9 @@ int TickFct_Input(int state) {
         case INPUT_START:
             state = INPUT_READ;
             break;
-
         case INPUT_READ:
             state = INPUT_READ;
             break;
-
         default:
             state = INPUT_START;
             break;
@@ -179,7 +167,7 @@ int TickFct_Input(int state) {
 
     switch (state) {
         case INPUT_READ: {
-            unsigned short joystickX = ADC_read(JOYSTICK_X_CHANNEL);
+            unsigned short joystickX = ADC_read(0);
 
             if (joystickX < JOYSTICK_LEFT_THRESHOLD) {
                 inputDirection = -1;
@@ -203,11 +191,9 @@ int TickFct_Paddle(int state) {
         case PADDLE_START:
             state = PADDLE_UPDATE;
             break;
-
         case PADDLE_UPDATE:
             state = PADDLE_UPDATE;
             break;
-
         default:
             state = PADDLE_START;
             break;
@@ -232,6 +218,8 @@ int TickFct_Paddle(int state) {
                 }
             }
             break;
+        default:
+          break;
     }
 
     return state;
