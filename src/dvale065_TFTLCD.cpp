@@ -19,6 +19,9 @@
 
 extern void SPI_SEND(char data);
 
+#define LCD_MADCTL_MY 0x80
+#define LCD_MADCTL_MX 0x40
+
 // lcd ignores spi when cs is 1
 static void LCD_select() {
   PORTB = SetBit(PORTB, LCD_CS, 0);
@@ -66,6 +69,8 @@ void LCD_init() {
   _delay_ms(200);
   LCD_sendCommand(ST7735_COLMOD);
   LCD_sendData(0x05);               // 16-bit color
+  LCD_sendCommand(ST7735_MADCTL);
+  LCD_sendData(LCD_MADCTL_MX | LCD_MADCTL_MY);
   _delay_ms(10);
   LCD_sendCommand(ST7735_DISPON);
   _delay_ms(200);
