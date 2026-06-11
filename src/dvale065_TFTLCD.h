@@ -29,6 +29,7 @@
 #define ST7735_SWRESET  0x01
 #define ST7735_SLPOUT   0x11
 #define ST7735_COLMOD   0x3A
+#define ST7735_MADCTL   0x36
 #define ST7735_DISPON   0x29
 #define ST7735_CASET    0x2A
 #define ST7735_RASET    0x2B

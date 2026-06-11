@@ -18,56 +18,23 @@
 #include "dvale065_TFTLCD.h"
 #include "dvale065_helpers.h"
 #include "dvale065_tasks.h"
+#include "dvale065_game.h"
 
-#define NUM_TASKS 3
+#define NUM_TASKS 5
 
-const unsigned long INPUT_PERIOD = 50;
-const unsigned long PADDLE_PERIOD = 50;
-const unsigned long DISPLAY_PERIOD = 50;
-const unsigned long GCD_PERIOD = 50;
+const unsigned long INPUT_PERIOD = 20;
+const unsigned long RESET_PERIOD = 50;
+const unsigned long PADDLE_PERIOD = 20;
+const unsigned long BALL_PERIOD = 40;
+const unsigned long DISPLAY_PERIOD = 20;
+const unsigned long GCD_PERIOD = 10;
 
 const unsigned char numTasks = NUM_TASKS;
 task tasks[NUM_TASKS];
 
-void DrawTestScreen() {
-  LCD_fillScreen(LCD_BLACK);
-
-  // bricks
-  for (unsigned char row = 0; row < 3; row++) {
-    for (unsigned char col = 0; col < 6; col++) {
-      unsigned char x = 105 - col * 20;
-      unsigned char y = 132 - row * 10;
-
-      unsigned int color;
-
-      if (row == 0) {
-        color = LCD_RED;
-      }
-      else if (row == 1) {
-        color = LCD_YELLOW;
-      }
-      else {
-        color = LCD_GREEN;
-      }
-
-      LCD_fillRect(x, y, 18, 8, color);
-    }
-  }
-
-  // ball
-  LCD_fillRect(61, 65, 5, 5, LCD_WHITE);
-
-  // paddle
-  LCD_fillRect(48, 10, 32, 5, LCD_WHITE);
-
-  //LCD_fillRect(117, 149, 8, 8, LCD_CYAN);
-  //LCD_fillRect(107, 149, 8, 8, LCD_CYAN);
-  //LCD_fillRect(97, 149, 8, 8, LCD_CYAN);
-}
-
 void TimerISR() {
   for (unsigned char i = 0; i < numTasks; i++) {
-    if (tasks[i].elapsedTime == tasks[i].period) {
+    if (tasks[i].elapsedTime >= tasks[i].period) {
       tasks[i].state = tasks[i].TickFct(tasks[i].state);
       tasks[i].elapsedTime = 0;
     }
@@ -87,8 +54,11 @@ void HardwareInit() {
   PORTB = SetBit(PORTB, LCD_DC, 1);  // data mode
   PORTD = SetBit(PORTD, LCD_RES, 1); // not resetting
 
-  DDRC = SetBit(DDRC, PC0, 0);       // joystick input
-  PORTC = SetBit(PORTC, PC0, 0);
+  DDRC = SetBit(DDRC, JOYSTICK_X_BIT, 0);
+  PORTC = SetBit(PORTC, JOYSTICK_X_BIT, 0);
+
+  DDRD = SetBit(DDRD, RESET_BUTTON_BIT, 0);
+  PORTD = SetBit(PORTD, RESET_BUTTON_BIT, 1); // internal pull-up
 }
 
 void TasksInit() {
@@ -101,9 +71,21 @@ void TasksInit() {
   i++;
 
   tasks[i].state = 0;
+  tasks[i].period = RESET_PERIOD;
+  tasks[i].elapsedTime = RESET_PERIOD;
+  tasks[i].TickFct = &TickFct_Reset;
+  i++;
+
+  tasks[i].state = 0;
   tasks[i].period = PADDLE_PERIOD;
   tasks[i].elapsedTime = PADDLE_PERIOD;
   tasks[i].TickFct = &TickFct_Paddle;
+  i++;
+
+  tasks[i].state = 0;
+  tasks[i].period = BALL_PERIOD;
+  tasks[i].elapsedTime = BALL_PERIOD;
+  tasks[i].TickFct = &TickFct_Ball;
   i++;
 
   tasks[i].state = 0;
