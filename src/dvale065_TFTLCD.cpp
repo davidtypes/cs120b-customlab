@@ -36,9 +36,9 @@ static void LCD_dataMode() {
 }
 
 static void LCD_hardwareReset() {
-  PORTD = PORTB = SetBit(PORTB, LCD_RES, 0);
+  PORTD = SetBit(PORTD, LCD_RES, 0);
   _delay_ms(200);
-  PORTD = PORTB = SetBit(PORTB, LCD_RES, 1);
+  PORTD = SetBit(PORTD, LCD_RES, 1);
   _delay_ms(200);
 }
 

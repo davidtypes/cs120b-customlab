@@ -1,226 +1,157 @@
 #include "dvale065_tasks.h"
 
-#include "dvale065_TFTLCD.h"
+#include "dvale065_game.h"
+#include "dvale065_helpers.h"
 #include <avr/io.h>
-
-#define PADDLE_WIDTH 32
-#define PADDLE_HEIGHT 5
-
-#define BALL_SIZE 5 // ball is not round :(
-
-#define BRICK_WIDTH 18
-#define BRICK_HEIGHT 8
-#define BRICK_X_SPACE 20
-#define BRICK_Y_SPACE 10
-#define BRICK_ROWS 3
-#define BRICK_COLS 6 // do not change probably...
-
-#define PADDLE_SPEED 2
 
 #define JOYSTICK_LEFT_THRESHOLD 350
 #define JOYSTICK_RIGHT_THRESHOLD 650
 
-unsigned char paddleX, paddleY;
-unsigned char lastPaddleX, lastPaddleY;
-unsigned char ballX, ballY;
-unsigned char lastBallX, lastBallY;
-
-bool bricks[BRICK_ROWS][BRICK_COLS]; // to know if a brick should be drawn...
-bool brickBroken; // flag for redraw, maybe later deprecated
-unsigned char brokenBrickRow, brokenBrickCol;
-unsigned char score;
-
-signed char inputDirection; // -1 = left, 0 = neutral, 1 = right
-
+static bool resetWasPressed = false;
 
 // lowkey i dont fully know how the adc stuff works
 void ADC_init() {
-    ADMUX = (1 << REFS0);
-    ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+  ADMUX = (1 << REFS0);
+  ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
 }
 
 unsigned short ADC_read(unsigned char channel) {
-    channel &= 0x07;
-    ADMUX = (ADMUX & 0xF0) | channel;
-    ADCSRA |= (1 << ADSC);
-    while (ADCSRA & (1 << ADSC)) {}
-    return ADC;
-}
-
-void drawBall(unsigned char x, unsigned char y, unsigned int color = LCD_WHITE) {
-    LCD_fillRect(x, y, BALL_SIZE, BALL_SIZE, color);
-}
-
-void drawPaddle(unsigned char x, unsigned char y, unsigned int color = LCD_WHITE) {
-    LCD_fillRect(x, y, PADDLE_WIDTH, PADDLE_HEIGHT, color);
-}
-
-void drawBricks() {
-    for (unsigned char row = 0; row < BRICK_ROWS; row++) {
-        for (unsigned char col = 0; col < BRICK_COLS; col++) {
-            if (!bricks[row][col]) {
-                continue;
-            }
-
-            unsigned char x = 105 - col * BRICK_X_SPACE;
-            unsigned char y = 132 - row * BRICK_Y_SPACE;
-
-            unsigned int color;
-
-            if (row == 0) {
-                color = LCD_RED;
-            }
-            else if (row == 1) {
-                color = LCD_YELLOW;
-            }
-            else {
-                color = LCD_GREEN;
-            }
-
-            LCD_fillRect(x, y, BRICK_WIDTH, BRICK_HEIGHT, color);
-        }
-    }
-}
-
-void gameInit() {
-    paddleX = 48;
-    paddleY = 10;
-    lastPaddleX = paddleX;
-    lastPaddleY = paddleY;
-
-    ballX = 61;
-    ballY = 65;
-    lastBallX = ballX;
-    lastBallY = ballY;
-
-    brickBroken = false;
-    brokenBrickRow = 0;
-    brokenBrickCol = 0;
-    score = 0;
-    inputDirection = 0;
-
-    for (unsigned char row = 0; row < BRICK_ROWS; row++) {
-      for (unsigned char col = 0; col < BRICK_COLS; col++) {
-        bricks[row][col] = true;
-      }
-    }
-
-  LCD_fillScreen(LCD_BLACK);
-  drawBall(ballX, ballY);
-  drawPaddle(paddleX, paddleY);
-  drawBricks();
-}
-
-enum Display_States { DISPLAY_START, DISPLAY_UPDATE };
-int TickFct_Display(int state) {
-    switch (state) {
-        case DISPLAY_START:
-            state = DISPLAY_UPDATE;
-            break;
-        case DISPLAY_UPDATE:
-            state = DISPLAY_UPDATE;
-            break;
-        default:
-            state = DISPLAY_START;
-            break;
-    }
-
-    switch (state) {
-        case DISPLAY_UPDATE:
-            if (brickBroken) {
-                unsigned char x = 105 - brokenBrickCol * BRICK_X_SPACE;
-                unsigned char y = 132 - brokenBrickRow * BRICK_Y_SPACE;
-                LCD_fillRect(x, y, BRICK_WIDTH, BRICK_HEIGHT, LCD_BLACK);
-                brickBroken = false;
-            }
-            if (ballX != lastBallX || ballY != lastBallY) {
-                drawBall(lastBallX, lastBallY, LCD_BLACK);
-                drawBall(ballX, ballY);
-                lastBallX = ballX;
-                lastBallY = ballY;
-            }
-            if (paddleX != lastPaddleX || paddleY != lastPaddleY) {
-                drawPaddle(lastPaddleX, lastPaddleY, LCD_BLACK);
-                drawPaddle(paddleX, paddleY);
-                lastPaddleX = paddleX;
-                lastPaddleY = paddleY;
-            }
-            break;
-    }
-
-    return state;
+  channel &= 0x07;
+  ADMUX = (ADMUX & 0xF0) | channel;
+  ADCSRA |= (1 << ADSC);
+  while (ADCSRA & (1 << ADSC)) {}
+  return ADC;
 }
 
 enum Input_States { INPUT_START, INPUT_READ };
 int TickFct_Input(int state) {
-    switch (state) {
-        case INPUT_START:
-            state = INPUT_READ;
-            break;
-        case INPUT_READ:
-            state = INPUT_READ;
-            break;
-        default:
-            state = INPUT_START;
-            break;
+  switch (state) {
+    case INPUT_START:
+      state = INPUT_READ;
+      break;
+    case INPUT_READ:
+      state = INPUT_READ;
+      break;
+    default:
+      state = INPUT_START;
+      break;
+  }
+
+  switch (state) {
+    case INPUT_READ: {
+      unsigned short joystickX = ADC_read(JOYSTICK_X_CHANNEL);
+
+      if (joystickX < JOYSTICK_LEFT_THRESHOLD) {
+        setInputDirection(-1);
+      }
+      else if (joystickX > JOYSTICK_RIGHT_THRESHOLD) {
+        setInputDirection(1);
+      }
+      else {
+        setInputDirection(0);
+      }
+      break;
     }
+  }
 
-    switch (state) {
-        case INPUT_READ: {
-            unsigned short joystickX = ADC_read(0);
+  return state;
+}
 
-            if (joystickX < JOYSTICK_LEFT_THRESHOLD) {
-                inputDirection = -1;
-            }
-            else if (joystickX > JOYSTICK_RIGHT_THRESHOLD) {
-                inputDirection = 1;
-            }
-            else {
-                inputDirection = 0;
-            }
-            break;
-        }
+enum Reset_States { RESET_START, RESET_WAIT };
+int TickFct_Reset(int state) {
+  switch (state) {
+    case RESET_START:
+      state = RESET_WAIT;
+      break;
+    case RESET_WAIT:
+      state = RESET_WAIT;
+      break;
+    default:
+      state = RESET_START;
+      break;
+  }
+
+  switch (state) {
+    case RESET_WAIT: {
+      bool resetPressed = !GetBit(PIND, RESET_BUTTON_BIT);
+
+      if (resetPressed && !resetWasPressed) {
+        joystickPress();
+      }
+
+      resetWasPressed = resetPressed;
+      break;
     }
+  }
 
-    return state;
+  return state;
 }
 
 enum Paddle_States { PADDLE_START, PADDLE_UPDATE };
 int TickFct_Paddle(int state) {
-    switch (state) {
-        case PADDLE_START:
-            state = PADDLE_UPDATE;
-            break;
-        case PADDLE_UPDATE:
-            state = PADDLE_UPDATE;
-            break;
-        default:
-            state = PADDLE_START;
-            break;
-    }
+  switch (state) {
+    case PADDLE_START:
+      state = PADDLE_UPDATE;
+      break;
+    case PADDLE_UPDATE:
+      state = PADDLE_UPDATE;
+      break;
+    default:
+      state = PADDLE_START;
+      break;
+  }
 
-    switch (state) {
-        case PADDLE_UPDATE:
-            if (inputDirection < 0) {
-                if (paddleX >= PADDLE_SPEED) {
-                    paddleX -= PADDLE_SPEED;
-                }
-                else {
-                    paddleX = 0;
-                }
-            }
-            else if (inputDirection > 0) {
-                if (paddleX + PADDLE_WIDTH + PADDLE_SPEED <= LCD_WIDTH) {
-                    paddleX += PADDLE_SPEED;
-                }
-                else {
-                    paddleX = LCD_WIDTH - PADDLE_WIDTH;
-                }
-            }
-            break;
-        default:
-          break;
-    }
+  switch (state) {
+    case PADDLE_UPDATE:
+      paddleTick();
+      break;
+  }
 
-    return state;
+  return state;
+}
+
+enum Ball_States { BALL_START, BALL_UPDATE };
+int TickFct_Ball(int state) {
+  switch (state) {
+    case BALL_START:
+      state = BALL_UPDATE;
+      break;
+    case BALL_UPDATE:
+      state = BALL_UPDATE;
+      break;
+    default:
+      state = BALL_START;
+      break;
+  }
+
+  switch (state) {
+    case BALL_UPDATE:
+      ballTick();
+      break;
+  }
+
+  return state;
+}
+
+enum Display_States { DISPLAY_START, DISPLAY_UPDATE };
+int TickFct_Display(int state) {
+  switch (state) {
+    case DISPLAY_START:
+      state = DISPLAY_UPDATE;
+      break;
+    case DISPLAY_UPDATE:
+      state = DISPLAY_UPDATE;
+      break;
+    default:
+      state = DISPLAY_START;
+      break;
+  }
+
+  switch (state) {
+    case DISPLAY_UPDATE:
+      tickDisplay();
+      break;
+  }
+
+  return state;
 }
